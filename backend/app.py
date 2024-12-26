@@ -25,45 +25,32 @@ def generate_random_state():
     return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
 
 
-@app.route('/login', methods=['GET'])
-def login():
-    """Initiate Spotify login process."""
-    state = generate_random_state()
+@app.route('/auth/spotify', methods=['GET'])
+def spotify_auth():
     scope = 'user-read-private user-read-email'
-
-    auth_url = (
-        'https://accounts.spotify.com/authorize?'
-        f'client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}'
-    )
-    return jsonify({'url': auth_url})
+    auth_url = f'https://accounts.spotify.com/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}&scope={scope}'
+    return jsonify({"auth_url": auth_url})
 
 
-@app.route('/callback', methods=['GET'])
+@app.route('/callback', methods=['POST'])
 def callback():
-    """Handle Spotify callback with authorization code."""
-    code = request.args.get('code')
-    state = request.args.get('state')
-
-    if not code:
-        return jsonify({'error': 'Authorization code not received'}), 400
+    data = request.json
+    code = data.get('code')
+    redirect_uri = data.get('redirect_uri')
 
     token_url = 'https://accounts.spotify.com/api/token'
     headers = {
         'Authorization': 'Basic ' + base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode(),
         'Content-Type': 'application/x-www-form-urlencoded',
     }
-    data = {
+    payload = {
         'grant_type': 'authorization_code',
         'code': code,
-        'redirect_uri': REDIRECT_URI,
+        'redirect_uri': redirect_uri,
     }
 
-    response = requests.post(token_url, headers=headers, data=data)
-    if response.status_code == 200:
-        token_data = response.json()
-        return jsonify({'access_token': token_data['access_token']})
-    else:
-        return jsonify({'error': 'Failed to obtain token'}), response.status_code
+    response = requests.post(token_url, headers=headers, data=payload)
+    return jsonify(response.json())
 
 if __name__ == '__main__':
     app.run(debug=True)
